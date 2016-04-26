@@ -2,13 +2,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"html/template"
 	"net/http"
 
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/prometheus/config"
-
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -26,6 +24,7 @@ func main() {
 		log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 	} else {
 		log.Infof("Starting Server: %s", *listenAddress)
+		t := template.Must(template.ParseFiles("toya.html"))
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			newcfg := &config.ScrapeConfig{}
 			newcfg.JobName = "aaa"
@@ -41,11 +40,7 @@ func main() {
 			for _, scfg := range conf.ScrapeConfigs {
 				newScrapeConfigs = append(newScrapeConfigs, scfg)
 			}
-			newYamlData, err := yaml.Marshal(&newScrapeConfigs)
-			if err != nil {
-				log.Fatalf("error: %v", err)
-			}
-			fmt.Fprint(w, string(newYamlData))
+			t.Execute(w, newScrapeConfigs)
 		})
 		err := http.ListenAndServe(*listenAddress, nil)
 		if err != nil {
