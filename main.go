@@ -22,15 +22,19 @@ func main() {
 	if err != nil {
 		log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 	} else {
-		cfg := &config.ScrapeConfig{}
-		cfg.JobName = "aaa"
+		newcfg := &config.ScrapeConfig{}
+		newcfg.JobName = "aaa"
+		fsdc := &config.FileSDConfig{}
+		fsdc.Names = []string{"aaa.yaml"}
+		newcfg.FileSDConfigs = append(newcfg.FileSDConfigs, fsdc)
+		rc := &config.RelabelConfig{}
+		rc.Regex = config.MustNewRegexp("(.*):\\d+")
+		newcfg.RelabelConfigs = append(newcfg.RelabelConfigs, rc)
+
 		var newScrapeConfigs []*config.ScrapeConfig
-		newScrapeConfigs = append(newScrapeConfigs, cfg)
+		newScrapeConfigs = append(newScrapeConfigs, newcfg)
 		for _, scfg := range conf.ScrapeConfigs {
 			newScrapeConfigs = append(newScrapeConfigs, scfg)
-		}
-		for _, nscfg := range newScrapeConfigs {
-			log.Info(nscfg.JobName)
 		}
 		newYamlData, err := yaml.Marshal(&newScrapeConfigs)
 		if err != nil {
