@@ -24,7 +24,8 @@ func main() {
 		log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 	} else {
 		log.Infof("Starting Server: %s", *listenAddress)
-		t := template.Must(template.ParseFiles("toya.html"))
+		t := template.Must(template.ParseFiles("templates/toya.html"))
+		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static")))) 
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			newcfg := &config.ScrapeConfig{}
 			newcfg.JobName = "aaa"

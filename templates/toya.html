@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>prometheus.yml</title>
+		<script src="static/vendor/bootstrap-3.3.6-dist/js/bootstrap.min.js"></script>
+		<link type="text/css" rel="stylesheet" href="static/vendor/bootstrap-3.3.6-dist/css/bootstrap.min.css">
+	</head>
+	<body>
+
+		<div class="navbar navbar-inverse navbar-static-top">
+			<div class="container-full">
+				<div class="navbar-header">
+					<a class="navbar-brand" href="/">toya</a>
+				</div>
+			</div>
+		</div>
+
+		<h1>Job List</h1>
+		<table class="table">
+			<thead>
+				<th>JobName</th>
+				<th>FileName</th>
+			</thead>
+			<tbody>
+				{{range .}}
+				<tr>
+					<td>{{.JobName}}</td>
+				{{range $fsdcf := .FileSDConfigs}}
+					<td>{{$fsdcf.Names}}</td>
+				{{end}}
+				</tr>
+				{{end}}
+			</tbody>
+		</table>
+
+		<form>
+			<div class="form-group">
+			<h4>Job Name</h4>
+			<input type="text" class="form-control" placeholder="example_node">
+		
+			<h4>exporter list</h4>
+			<textarea class="form-control" rows="10" placeholder="example.com:9100"></textarea>
+		  	</div>
+		
+			<button type="submit" class="btn btn-default">Add</button>
+		</form>
+
+	</body>
+</html>
