@@ -1,6 +1,7 @@
 # toya
-toya is the Web Application to edit prometheus configuration file
-toya derives from Lake Toya (Toyako) in Japan
+toya is the Web Application to edit prometheus configuration file.
+
+toya derives from Lake Toya (Toyako) in Japan.
 
 How to build
 ```
