@@ -7,4 +7,5 @@ How to build
 ```
 go get github.com/prometheus/prometheus/config
 go get github.com/prometheus/log
+go get gopkg.in/yaml.v2
 ```
