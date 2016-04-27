@@ -27,21 +27,9 @@ func main() {
 		t := template.Must(template.ParseFiles("templates/toya.html"))
 		http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static")))) 
 		http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			newcfg := &config.ScrapeConfig{}
-			newcfg.JobName = "aaa"
-			fsdc := &config.FileSDConfig{}
-			fsdc.Names = []string{"aaa.yaml"}
-			newcfg.FileSDConfigs = append(newcfg.FileSDConfigs, fsdc)
-			rc := &config.RelabelConfig{}
-			rc.Regex = config.MustNewRegexp("(.*):\\d+")
-			newcfg.RelabelConfigs = append(newcfg.RelabelConfigs, rc)
-
-			var newScrapeConfigs []*config.ScrapeConfig
-			newScrapeConfigs = append(newScrapeConfigs, newcfg)
-			for _, scfg := range conf.ScrapeConfigs {
-				newScrapeConfigs = append(newScrapeConfigs, scfg)
+			if r.Method == "GET" {
+				t.Execute(w, conf.ScrapeConfigs)
 			}
-			t.Execute(w, newScrapeConfigs)
 		})
 		err := http.ListenAndServe(*listenAddress, nil)
 		if err != nil {
