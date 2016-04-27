@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/prometheus/config"
@@ -15,8 +18,9 @@ import (
 
 var (
 	configFile      = flag.String("config.file", "prometheus.yml", "prometheus configuration file name.")
-	exporterListDir = flag.String("exporter.list.dir", ".", "file_sd_configs names file dir")
+	exporterListDir = flag.String("exporter.list.dir", "/tmp", "file_sd_configs names file dir")
 	listenAddress   = flag.String("listen-address", ":12345", "The address to listen on for HTTP requests.")
+	prometheusUrl   = flag.String("prometheus.url", "http://localhost:9090", "prometheus")
 )
 
 func rewrite() {
@@ -39,7 +43,8 @@ func create(job_name string, exporter_list string) {
 	newcfg.JobName = job_name
 	fsdc := &config.FileSDConfig{}
 	exporterListFile := filepath.Join(*exporterListDir, job_name+".yml")
-	exporterListFileWriteErr := ioutil.WriteFile(exporterListFile, []byte(exporter_list), 0644)
+	strs := "'" + strings.Replace(exporter_list, "\r\n", "','", -1) + "'"
+	exporterListFileWriteErr := ioutil.WriteFile(exporterListFile, []byte(fmt.Sprintf("[{\"targets\":[%s]}]", strs)), 0644)
 	if exporterListFileWriteErr != nil {
 		log.Fatalf("error: %v", exporterListFileWriteErr)
 	}
@@ -68,6 +73,10 @@ func create(job_name string, exporter_list string) {
 		log.Fatalf("error: %v", writeErr)
 	}
 	rewrite()
+	_, postErr := http.PostForm(*prometheusUrl+"/-/reload", url.Values{})
+	if postErr != nil {
+		log.Fatalf("error: %v", postErr)
+	}
 }
 
 func main() {
