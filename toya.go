@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/prometheus/config"
@@ -13,8 +14,9 @@ import (
 )
 
 var (
-	configFile    = flag.String("config.file", "prometheus.yml", "prometheus configuration file name.")
-	listenAddress = flag.String("listen-address", ":12345", "The address to listen on for HTTP requests.")
+	configFile      = flag.String("config.file", "prometheus.yml", "prometheus configuration file name.")
+	exporterListDir = flag.String("exporter.list.dir", ".", "file_sd_configs names file dir")
+	listenAddress   = flag.String("listen-address", ":12345", "The address to listen on for HTTP requests.")
 )
 
 func rewrite() {
@@ -32,11 +34,16 @@ func rewrite() {
 	}
 }
 
-func create(job_name string) {
+func create(job_name string, exporter_list string) {
 	newcfg := &config.ScrapeConfig{}
 	newcfg.JobName = job_name
 	fsdc := &config.FileSDConfig{}
-	fsdc.Names = []string{"aaa.yaml"}
+	exporterListFile := filepath.Join(*exporterListDir, job_name+".yml")
+	exporterListFileWriteErr := ioutil.WriteFile(exporterListFile, []byte(exporter_list), 0644)
+	if exporterListFileWriteErr != nil {
+		log.Fatalf("error: %v", exporterListFileWriteErr)
+	}
+	fsdc.Names = []string{exporterListFile}
 	newcfg.FileSDConfigs = append(newcfg.FileSDConfigs, fsdc)
 	rc := &config.RelabelConfig{}
 	rc.Regex = config.MustNewRegexp("(.*):\\d+")
@@ -84,7 +91,7 @@ func main() {
 	http.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		if r.Method == "POST" {
-			create(r.FormValue("job_name"))
+			create(r.FormValue("job_name"), r.FormValue("exporter_list"))
 			http.Redirect(w, r, "/", http.StatusFound)
 		}
 	})
