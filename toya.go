@@ -17,7 +17,7 @@ import (
 )
 
 type Page struct {
-	ScrapeConfigs       []*config.ScrapeConfig
+	JobExporterMap      map[string]string
 	ErrorMessage        string
 	PrometheusStatusUrl string
 }
@@ -126,8 +126,18 @@ func main() {
 		if err != nil {
 			log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 		}
+		jobExporterMap := make(map[string]string)
+		for _, scfg := range conf.ScrapeConfigs {
+			for _, fsdc := range scfg.FileSDConfigs {
+				content, e := ioutil.ReadFile(fsdc.Names[0])
+				if e != nil {
+					log.Fatalf("error: %v", e)
+				}
+				jobExporterMap[scfg.JobName] = string(content)
+			}
+		}
 		page := Page{
-			ScrapeConfigs:       conf.ScrapeConfigs,
+			JobExporterMap:      jobExporterMap,
 			ErrorMessage:        errorMessage,
 			PrometheusStatusUrl: *prometheusUrl + "/status",
 		}

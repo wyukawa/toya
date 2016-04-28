@@ -21,16 +21,14 @@
 
                 <table class="table">
                         <thead>
-                                <th>JobName</th>
-                                <th>FileName</th>
+                                <th>Job Name</th>
+                                <th>Exporter list</th>
                         </thead>
                         <tbody>
-                                {{range $sc := .ScrapeConfigs}}
+                                {{range $JobName, $content := .JobExporterMap}}
                                 <tr>
-                                        <td>{{$sc.JobName}}</td>
-                                {{range $fsdcf := $sc.FileSDConfigs}}
-                                        <td>{{$fsdcf.Names}}</td>
-                                {{end}}
+                                        <td>{{$JobName}}</td>
+                                        <td>{{$content}}</td>
                                 </tr>
                                 {{end}}
                         </tbody>
