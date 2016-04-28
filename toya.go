@@ -16,6 +16,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+type Page struct {
+	ScrapeConfigs       []*config.ScrapeConfig
+	ErrorMessage        string
+	PrometheusStatusUrl string
+}
+
 var (
 	configFile      = flag.String("config.file", "prometheus.yml", "prometheus configuration file name.")
 	exporterListDir = flag.String("exporter.list.dir", "/tmp", "file_sd_configs names file dir")
@@ -89,20 +95,43 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		if r.Method == "GET" {
+		errorMessage := ""
+		if r.Method == "POST" {
+			if r.FormValue("job_name") == "" {
+				errorMessage += "Job Name is required\n"
+			}
 			conf, err := config.LoadFile(*configFile)
 			if err != nil {
 				log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 			}
-			t.Execute(w, conf.ScrapeConfigs)
+			for _, scfg := range conf.ScrapeConfigs {
+				if r.FormValue("job_name") == scfg.JobName {
+					errorMessage += "duplicate Job Name\n"
+					break
+				}
+			}
+			if r.FormValue("exporter_list") == "" {
+				errorMessage += "Exporter lis is required\n"
+			}
+			for _, exporter := range strings.Split(r.FormValue("exporter_list"), "\r\n") {
+				if strings.Contains(exporter, "/") {
+					errorMessage += exporter + " is not a valid hostname\n"
+				}
+			}
+			if errorMessage == "" {
+				create(r.FormValue("job_name"), r.FormValue("exporter_list"))
+			}
 		}
-	})
-	http.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		if r.Method == "POST" {
-			create(r.FormValue("job_name"), r.FormValue("exporter_list"))
-			http.Redirect(w, r, "/", http.StatusFound)
+		conf, err := config.LoadFile(*configFile)
+		if err != nil {
+			log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
 		}
+		page := Page{
+			ScrapeConfigs:       conf.ScrapeConfigs,
+			ErrorMessage:        errorMessage,
+			PrometheusStatusUrl: *prometheusUrl + "/status",
+		}
+		t.Execute(w, page)
 	})
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
