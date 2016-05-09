@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/prometheus/common/log"
 	"github.com/prometheus/prometheus/config"
 
@@ -29,22 +31,23 @@ var (
 	prometheusUrl   = flag.String("prometheus.url", "http://localhost:9090", "prometheus")
 )
 
-func rewrite() {
+func rewrite() error {
 	conf, err := config.LoadFile(*configFile)
 	if err != nil {
-		log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
+		return errors.Wrapf(err, "Couldn't load configuration (-config.file=%s): %v", *configFile)
 	}
 	yamlData, yamlErr := yaml.Marshal(&conf)
 	if yamlErr != nil {
-		log.Fatalf("error: %v", yamlErr)
+		return errors.Wrapf(yamlErr, "yaml marshal error: %v", yamlErr)
 	}
 	writeErr := ioutil.WriteFile(*configFile, yamlData, 0644)
 	if writeErr != nil {
-		log.Fatalf("error: %v", writeErr)
+		return errors.Wrapf(writeErr, "yaml write error: %v", writeErr)
 	}
+	return nil
 }
 
-func create(job_name string, exporter_list string) {
+func create(job_name string, exporter_list string) error {
 	newcfg := &config.ScrapeConfig{}
 	newcfg.JobName = job_name
 	fsdc := &config.FileSDConfig{}
@@ -52,7 +55,7 @@ func create(job_name string, exporter_list string) {
 	strs := "'" + strings.Replace(exporter_list, "\r\n", "','", -1) + "'"
 	exporterListFileWriteErr := ioutil.WriteFile(exporterListFile, []byte(fmt.Sprintf("[{\"targets\":[%s]}]", strs)), 0644)
 	if exporterListFileWriteErr != nil {
-		log.Fatalf("error: %v", exporterListFileWriteErr)
+		return errors.Wrapf(exporterListFileWriteErr, "error: %v", exporterListFileWriteErr)
 	}
 	fsdc.Names = []string{exporterListFile}
 	newcfg.FileSDConfigs = append(newcfg.FileSDConfigs, fsdc)
@@ -64,7 +67,7 @@ func create(job_name string, exporter_list string) {
 	newScrapeConfigs = append(newScrapeConfigs, newcfg)
 	conf, confErr := config.LoadFile(*configFile)
 	if confErr != nil {
-		log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, confErr)
+		return errors.Wrapf(confErr, "Couldn't load configuration (-config.file=%s): %v", *configFile, confErr)
 	}
 	for _, scfg := range conf.ScrapeConfigs {
 		newScrapeConfigs = append(newScrapeConfigs, scfg)
@@ -72,17 +75,21 @@ func create(job_name string, exporter_list string) {
 	conf.ScrapeConfigs = newScrapeConfigs
 	newYamlData, err := yaml.Marshal(&conf)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		return errors.Wrapf(err, "yaml marshal error: %v", err)
 	}
 	writeErr := ioutil.WriteFile(*configFile, newYamlData, 0644)
 	if writeErr != nil {
-		log.Fatalf("error: %v", writeErr)
+		return errors.Wrapf(writeErr, "write error: %v", writeErr)
 	}
-	rewrite()
+	rewriteErr := rewrite()
+	if rewriteErr != nil {
+		return errors.Wrapf(rewriteErr, "rewrite error: %v", rewriteErr)
+	}
 	_, postErr := http.PostForm(*prometheusUrl+"/-/reload", url.Values{})
 	if postErr != nil {
-		log.Fatalf("error: %v", postErr)
+		return errors.Wrapf(postErr, "post error: %v", postErr)
 	}
+	return nil
 }
 
 func main() {
@@ -102,7 +109,8 @@ func main() {
 			}
 			conf, err := config.LoadFile(*configFile)
 			if err != nil {
-				log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
+				log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile)
+				return
 			}
 			for _, scfg := range conf.ScrapeConfigs {
 				if r.FormValue("job_name") == scfg.JobName {
@@ -119,12 +127,17 @@ func main() {
 				}
 			}
 			if errorMessage == "" {
-				create(r.FormValue("job_name"), r.FormValue("exporter_list"))
+				err := create(r.FormValue("job_name"), r.FormValue("exporter_list"))
+				if err != nil {
+					log.Errorf("create error: %v", err)
+					return
+				}
 			}
 		}
 		conf, err := config.LoadFile(*configFile)
 		if err != nil {
 			log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
+			return
 		}
 		jobExporterMap := make(map[string]string)
 		for _, scfg := range conf.ScrapeConfigs {
