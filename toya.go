@@ -27,7 +27,7 @@ type Page struct {
 var (
 	configFile      = flag.String("config.file", "prometheus.yml", "prometheus configuration file name.")
 	exporterListDir = flag.String("exporter.list.dir", "/tmp", "file_sd_configs names file dir")
-	listenAddress   = flag.String("listen-address", ":12345", "The address to listen on for HTTP requests.")
+	listenAddress   = flag.String("listen-address", ":20010", "The address to listen on for HTTP requests.")
 	prometheusUrl   = flag.String("prometheus.url", "http://localhost:9090", "prometheus")
 )
 
