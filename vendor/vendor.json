@@ -1,0 +1,16 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"path": "gopkg.in/fsnotify.v1",
+			"revision": "96c060f6a6b7e0d6f75fddd10efeaca3e5d1bcb0",
+			"revisionTime": "2015-02-08T13:29:58-07:00"
+		},
+		{
+			"path": "gopkg.in/yaml.v2",
+			"revision": "7ad95dd0798a40da1ccdff6dff35fd177b5edf40",
+			"revisionTime": "2015-06-24T11:29:02+01:00"
+		}
+	]
+}
