@@ -144,7 +144,8 @@ func main() {
 			for _, fsdc := range scfg.FileSDConfigs {
 				content, e := ioutil.ReadFile(fsdc.Names[0])
 				if e != nil {
-					log.Fatalf("error: %v", e)
+					log.Errorf("error: %v", e)
+					return
 				}
 				jobExporterMap[scfg.JobName] = string(content)
 			}
@@ -158,7 +159,8 @@ func main() {
 	})
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		log.Errorf("error: %v", err)
+		return
 	}
 
 }
