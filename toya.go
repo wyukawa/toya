@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -73,6 +74,14 @@ func create(job_name string, exporter_list string) error {
 		newScrapeConfigs = append(newScrapeConfigs, scfg)
 	}
 	conf.ScrapeConfigs = newScrapeConfigs
+	reloadErr := reload(conf)
+	if reloadErr != nil {
+		return errors.Wrapf(reloadErr, "reload error %v", reloadErr)
+	}
+	return nil
+}
+
+func reload(conf *config.Config) error {
 	newYamlData, err := yaml.Marshal(&conf)
 	if err != nil {
 		return errors.Wrapf(err, "yaml marshal error: %v", err)
@@ -92,6 +101,56 @@ func create(job_name string, exporter_list string) error {
 	return nil
 }
 
+func loadPage(w http.ResponseWriter, t *template.Template, errorMessage string) error {
+	conf, err := config.LoadFile(*configFile)
+	if err != nil {
+		return errors.Wrapf(err, "Couldn't load configuration (-config.file=%s): %v", *configFile, err)
+	}
+	jobExporterMap := make(map[string]string)
+	for _, scfg := range conf.ScrapeConfigs {
+		for _, fsdc := range scfg.FileSDConfigs {
+			content, e := ioutil.ReadFile(fsdc.Names[0])
+			if e != nil {
+				return errors.Wrapf(e, "read file error: %v", e)
+			}
+			jobExporterMap[scfg.JobName] = string(content)
+		}
+	}
+	page := Page{
+		JobExporterMap:      jobExporterMap,
+		ErrorMessage:        errorMessage,
+		PrometheusStatusUrl: *prometheusUrl + "/status",
+	}
+	t.Execute(w, page)
+	return nil
+}
+
+func delete(job_name string) error {
+	conf, err := config.LoadFile(*configFile)
+	if err != nil {
+		return errors.Wrapf(err, "Couldn't load configuration (-config.file=%s): %v", *configFile, err)
+	}
+	var newScrapeConfigs []*config.ScrapeConfig
+	for _, scfg := range conf.ScrapeConfigs {
+		if scfg.JobName == job_name {
+			for _, fsdc := range scfg.FileSDConfigs {
+				removeErr := os.Remove(fsdc.Names[0])
+				if removeErr != nil {
+					return errors.Wrapf(removeErr, "remove error %v", removeErr)
+				}
+			}
+		} else {
+			newScrapeConfigs = append(newScrapeConfigs, scfg)
+		}
+	}
+	conf.ScrapeConfigs = newScrapeConfigs
+	reloadErr := reload(conf)
+	if reloadErr != nil {
+		return errors.Wrapf(reloadErr, "reload error %v", reloadErr)
+	}
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
@@ -102,8 +161,22 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		errorMessage := ""
+
+		if r.Method == "GET" {
+			loadPageErr := loadPage(w, t, "")
+			if loadPageErr != nil {
+				log.Errorf("loadPage error: %v", loadPageErr)
+				return
+			}
+		}
+
+	})
+
+	http.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
 		if r.Method == "POST" {
+			errorMessage := ""
 			if r.FormValue("job_name") == "" {
 				errorMessage += "Job Name is required\n"
 			}
@@ -133,30 +206,26 @@ func main() {
 					return
 				}
 			}
+
+			http.Redirect(w, r, "/", http.StatusFound)
 		}
-		conf, err := config.LoadFile(*configFile)
-		if err != nil {
-			log.Errorf("Couldn't load configuration (-config.file=%s): %v", *configFile, err)
-			return
-		}
-		jobExporterMap := make(map[string]string)
-		for _, scfg := range conf.ScrapeConfigs {
-			for _, fsdc := range scfg.FileSDConfigs {
-				content, e := ioutil.ReadFile(fsdc.Names[0])
-				if e != nil {
-					log.Errorf("error: %v", e)
-					return
-				}
-				jobExporterMap[scfg.JobName] = string(content)
-			}
-		}
-		page := Page{
-			JobExporterMap:      jobExporterMap,
-			ErrorMessage:        errorMessage,
-			PrometheusStatusUrl: *prometheusUrl + "/status",
-		}
-		t.Execute(w, page)
+
 	})
+
+	http.HandleFunc("/delete", func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		if r.Method == "POST" {
+			deleteErr := delete(r.FormValue("job_name"))
+			if deleteErr != nil {
+				log.Errorf("delete error: %v", deleteErr)
+				return
+			}
+			http.Redirect(w, r, "/", http.StatusFound)
+		}
+
+	})
+
 	err := http.ListenAndServe(*listenAddress, nil)
 	if err != nil {
 		log.Errorf("error: %v", err)
